@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Safe Flights Pro Tracker</title>
+
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet/dist/leaflet.css"
+/>
+
+<style>
+
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  overflow:hidden;
+  background:#111;
+  color:white;
+}
+
+#map{
+  width:100%;
+  height:100vh;
+}
+
+/* DASHBOARD */
+
+.dashboard{
+  position:absolute;
+  top:10px;
+  left:10px;
+  width:320px;
+  max-height:90vh;
+  overflow:auto;
+  background:#1b1b1b;
+  color:white;
+  z-index:9999;
+  border-radius:12px;
+  padding:15px;
+  box-shadow:0 0 20px rgba(0,0,0,0.5);
+}
+
+.dashboard h2{
+  margin-top:0;
+}
+
+/* STATS */
+
+.stats{
+  display:flex;
+  gap:10px;
+  margin-bottom:15px;
+}
+
+.stat-box{
+  flex:1;
+  background:#2b2b2b;
+  padding:10px;
+  border-radius:8px;
+  text-align:center;
+  font-size:13px;
+}
+
+/* FLIGHT LIST */
+
+.flight-card{
+  border-bottom:1px solid #333;
+  padding:10px 0;
+  font-size:13px;
+}
+
+.flight-card:last-child{
+  border-bottom:none;
+}
+
+/* STATUS COLORS */
+
+.status{
+  font-weight:bold;
+}
+
+.flying{
+  color:#00d4ff;
+}
+
+.boarding{
+  color:#ffb300;
+}
+
+.delayed{
+  color:#ff3b3b;
+}
+
+/* LABELS */
+
+.route-label{
+  background:#000;
+  color:white;
+  padding:3px 6px;
+  border-radius:4px;
+  font-size:11px;
+  white-space:nowrap;
+  border:1px solid #00d4ff;
+}
+
+/* POPUP */
+
+.leaflet-popup-content{
+  font-size:13px;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- DASHBOARD -->
+
+<div class="dashboard">
+
+  <h2>✈ Safe Flights</h2>
+
+  <div class="stats">
+
+    <div class="stat-box">
+      <div id="totalFlights">0</div>
+      Flights
+    </div>
+
+    <div class="stat-box">
+      <div id="flyingFlights">0</div>
+      Flying
+    </div>
+
+    <div class="stat-box">
+      <div id="delayedFlights">0</div>
+      Delayed
+    </div>
+
+  </div>
+
+  <div id="flightList"></div>
+
+</div>
+
+<!-- MAP -->
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+
+// ✈ FLIGHT DATA
+
+const flights = [
+
+{
+flight:"GF101",
+airline:"SkyWorld",
+from:"Barcelona",
+to:"New York",
+start:[41.3851,2.1734],
+end:[40.7128,-74.006],
+status:"Flying",
+speed:0.06,
+gate:"A1",
+pilot:"John Carter",
+aircraft:"Boeing 787",
+departure:"8:00",
+arrival:"16:00"
+},
+
+{
+flight:"GF102",
+airline:"AeroJet",
+from:"London",
+to:"Tokyo",
+start:[51.5074,-0.1278],
+end:[35.6762,139.6503],
+status:"Boarding",
+speed:0.035,
+gate:"B2",
+pilot:"Sarah Lee",
+aircraft:"Airbus A350",
+departure:"9:00",
+arrival:"22:00"
+},
+
+{
+flight:"GF103",
+airline:"CloudAir",
+from:"Paris",
+to:"Dubai",
+start:[48.8566,2.3522],
+end:[25.2048,55.2708],
+status:"Delayed",
+speed:0.05,
+gate:"C4",
+pilot:"Mike Adams",
+aircraft:"Boeing 777",
+departure:"11:30",
+arrival:"18:45"
+},
+
+{
+flight:"GF104",
+airline:"PacificFly",
+from:"Sydney",
+to:"Singapore",
+start:[-33.87,151.2093],
+end:[1.3521,103.8198],
+status:"Flying",
+speed:0.03,
+gate:"D1",
+pilot:"Emma Stone",
+aircraft:"Airbus A380",
+departure:"13:00",
+arrival:"19:30"
+},
+
+{
+flight:"GF105",
+airline:"Northern Wings",
+from:"Toronto",
+to:"Los Angeles",
+start:[43.6532,-79.3832],
+end:[34.0522,-118.2437],
+status:"Flying",
+speed:0.045,
+gate:"E3",
+pilot:"David Ross",
+aircraft:"Boeing 737",
+departure:"10:45",
+arrival:"15:10"
+},
+
+{
+flight:"GF107",
+airline:"Atlantic Sky",
+from:"Madrid",
+to:"Mexico City",
+start:[40.4168,-3.7038],
+end:[19.4326,-99.1332],
+status:"Flying",
+speed:0.028,
+gate:"G5",
+pilot:"Daniel Cruz",
+aircraft:"Boeing 787",
+departure:"6:00",
+arrival:"18:20"
+},
+
+{
+flight:"GF108",
+airline:"Eastern Air",
+from:"Mumbai",
+to:"Bangkok",
+start:[19.076,72.8777],
+end:[13.7563,100.5018],
+status:"Delayed",
+speed:0.055,
+gate:"H6",
+pilot:"Priya Shah",
+aircraft:"Airbus A321",
+departure:"15:30",
+arrival:"20:15"
+},
+
+{
+flight:"GF109",
+airline:"African Connect",
+from:"Cape Town",
+to:"Cairo",
+start:[-33.9249,18.4241],
+end:[30.0444,31.2357],
+status:"Flying",
+speed:0.032,
+gate:"J2",
+pilot:"Ahmed Hassan",
+aircraft:"Boeing 777",
+departure:"9:15",
+arrival:"17:00"
+},
+
+{
+flight:"GF110",
+airline:"Siberia Air",
+from:"Moscow",
+to:"Beijing",
+start:[55.7558,37.6173],
+end:[39.9042,116.4074],
+status:"Flying",
+speed:0.04,
+gate:"K4",
+pilot:"Ivan Petrov",
+aircraft:"Airbus A350",
+departure:"12:00",
+arrival:"21:00"
+},
+
+{
+flight:"GF111",
+airline:"Oceanic",
+from:"San Francisco",
+to:"Honolulu",
+start:[37.7749,-122.4194],
+end:[21.3069,-157.8583],
+status:"Boarding",
+speed:0.038,
+gate:"L7",
+pilot:"Chris Walker",
+aircraft:"Boeing 787",
+departure:"14:20",
+arrival:"20:40"
+},
+
+{
+flight:"GF112",
+airline:"AsiaJet",
+from:"Seoul",
+to:"Jakarta",
+start:[37.57,126.978],
+end:[-6.2088,106.8456],
+status:"Flying",
+speed:0.042,
+gate:"M3",
+pilot:"Kim Jiho",
+aircraft:"Airbus A330",
+departure:"5:50",
+arrival:"13:30"
+},
+
+{
+flight:"GF113",
+airline:"Arctic Fly",
+from:"Lisbon",
+to:"Reykjavik",
+start:[38.7223,-9.1393],
+end:[64.1466,-21.9426],
+status:"Delayed",
+speed:0.05,
+gate:"N1",
+pilot:"Sofia Mendes",
+aircraft:"Boeing 737",
+departure:"17:00",
+arrival:"22:10"
+},
+
+{
+flight:"GF114",
+airline:"Andes Air",
+from:"Buenos Aires",
+to:"Santiago",
+start:[-34.6037,-58.3816],
+end:[-33.4489,-70.6693],
+status:"Flying",
+speed:0.065,
+gate:"P8",
+pilot:"Carlos Vega",
+aircraft:"Airbus A320",
+departure:"8:40",
+arrival:"11:00"
+}
+
+];
+
+// 🌍 MAP
+
+const map = L.map('map').setView([20,0],2);
+
+// 🌙 DARK MAP
+
+L.tileLayer(
+'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+{
+attribution:'&copy; OpenStreetMap & CARTO'
+}
+).addTo(map);
+
+// ✈ PLANE ICON
+
+const planeIcon = L.icon({
+iconUrl:'https://cdn-icons-png.flaticon.com/512/870/870143.png',
+iconSize:[32,32],
+iconAnchor:[16,16]
+});
+
+// 📊 STATS
+
+document.getElementById("totalFlights").innerText =
+flights.length;
+
+document.getElementById("flyingFlights").innerText =
+flights.filter(f => f.status === "Flying").length;
+
+document.getElementById("delayedFlights").innerText =
+flights.filter(f => f.status === "Delayed").length;
+
+// 📋 FLIGHT LIST
+
+const list = document.getElementById("flightList");
+
+// ✈ CREATE FLIGHTS
+
+flights.forEach(flight => {
+
+const statusClass =
+flight.status.toLowerCase();
+
+// DASHBOARD CARD
+
+const div = document.createElement("div");
+
+div.className = "flight-card";
+
+div.innerHTML = `
+<b>${flight.flight}</b> - ${flight.airline}<br>
+${flight.from} → ${flight.to}<br>
+Pilot: ${flight.pilot}<br>
+Aircraft: ${flight.aircraft}<br>
+Gate: ${flight.gate}<br>
+<span class="status ${statusClass}">
+${flight.status}
+</span>
+`;
+
+list.appendChild(div);
+
+// 🌍 CURVED ROUTE
+
+const points = [];
+
+for(let i=0;i<=100;i++){
+
+const t = i/100;
+
+const lat =
+flight.start[0] +
+(flight.end[0]-flight.start[0])*t +
+Math.sin(t*Math.PI)*5;
+
+const lng =
+flight.start[1] +
+(flight.end[1]-flight.start[1])*t;
+
+points.push([lat,lng]);
+}
+
+// 🎨 ROUTE COLORS
+
+let routeColor = "#00d4ff";
+
+if(flight.status === "Delayed"){
+routeColor = "#ff3b3b";
+}
+
+if(flight.status === "Boarding"){
+routeColor = "#ffb300";
+}
+
+// ✈ ROUTE LINE
+
+L.polyline(points,{
+color:routeColor,
+weight:2
+}).addTo(map);
+
+// ✈ PLANE
+
+const plane = L.marker(points[0],{
+icon:planeIcon
+}).addTo(map);
+
+// 📍 POPUP
+
+plane.bindPopup(`
+<b>${flight.flight}</b><br>
+${flight.airline}<br><br>
+
+✈ ${flight.from} → ${flight.to}<br>
+👨‍✈️ Pilot: ${flight.pilot}<br>
+🛩 Aircraft: ${flight.aircraft}<br>
+🚪 Gate: ${flight.gate}<br>
+📡 Status: ${flight.status}<br>
+🕓 Departure: ${flight.departure}<br>
+🕓 Arrival: ${flight.arrival}
+`);
+
+// 🏷 LABEL
+
+L.marker(points[0],{
+icon:L.divIcon({
+className:'',
+html:`
+<div class="route-label">
+${flight.from} → ${flight.to}
+</div>
+`
+})
+}).addTo(map);
+
+// 🚀 ANIMATION
+
+let index = 0;
+
+function animate(){
+
+index += flight.speed;
+
+if(index >= points.length){
+index = 0;
+}
+
+plane.setLatLng(points[Math.floor(index)]);
+
+requestAnimationFrame(animate);
+}
+
+animate();
+
+});
+
+</script>
+
+</body>
+</html>
